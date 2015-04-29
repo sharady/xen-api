@@ -277,7 +277,7 @@ let make_pif_metrics ~__context =
 		~device_name:"" ~vendor_name:"" ~device_id:"" ~vendor_id:""
 		~speed:0L ~duplex:false ~pci_bus_path:""
 		~io_read_kbs:0. ~io_write_kbs:0. ~last_updated:(Date.of_float 0.)
-		~other_config:[] in
+		~other_config:[] ~fcoe_status:false in
 	metrics
 
 let property_names_and_values = [

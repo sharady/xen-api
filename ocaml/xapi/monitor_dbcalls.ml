@@ -124,6 +124,7 @@ let get_pif_and_bond_changes () =
 				pif_raw_tx = 0L;
 				pif_raw_rx = 0L;
 				pif_carrier = stat.carrier;
+				(*pif_fcoe_status = true;*)
 				pif_speed = stat.speed;
 				pif_duplex = stat.duplex;
 				pif_pci_bus_path = stat.pci_bus_path;

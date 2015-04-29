@@ -60,6 +60,7 @@ type pif = {
 	pif_raw_tx: int64;
 	pif_raw_rx: int64;
 	pif_carrier: bool;
+	(*pif_fcoe_status: bool;*)
 	pif_speed: int;
 	pif_duplex: Network_interface.duplex;
 	pif_pci_bus_path: string;
