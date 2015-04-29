@@ -281,11 +281,11 @@ let make_pif_metrics ~__context =
 	metrics
 
 let property_names_and_values = [
-	"gro", ["on"; "off"]
+	"gro", ["on"; "off"]; "fcoe", ["on"; "off"]
 ]
 
 let default_properties = [
-	"gro", "on"
+	"gro", "on"; "fcoe", "off"
 ]
 
 let pif_has_properties ~__context ~self =
@@ -665,6 +665,11 @@ let set_primary_address_type ~__context ~self ~primary_address_type =
 
 	Db.PIF.set_primary_address_type ~__context ~self ~value:primary_address_type;
 	Monitor_dbcalls.clear_cache_for_pif ~pif_name:(Db.PIF.get_device ~__context ~self)
+
+let enable_fcoe ~__context ~self =
+	let dbg = Context.string_of_task __context in
+	let device = Db.PIF.get_device ~__context ~self in 
+	Net.Interface.enable_fcoe dbg ~device:device
 
 let set_property ~__context ~self ~name ~value =
 	let fail () = raise (Api_errors.Server_error
