@@ -441,6 +441,13 @@ let bring_pif_up ~__context ?(management_interface=false) (pif: API.ref_PIF) =
 			Master_connection.force_connection_reset ()
 		end;
 
+		let device = Db.PIF.get_device ~__context ~self:pif in
+		let metrics = Db.PIF.get_metrics ~__context ~self:pif in
+		if Net.Interface.is_fcoe_supported dbg device = true then begin
+			debug "FCoE is supported on device %s" device;
+			Db.PIF_metrics.set_fcoe_supported ~__context ~self:metrics ~value:true
+		end;
+
 		if rc.API.pIF_currently_attached = false || management_interface then begin
 			if management_interface then begin
 				warn "About to kill active client stunnels";

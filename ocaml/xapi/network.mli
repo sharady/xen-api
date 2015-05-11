@@ -11,6 +11,7 @@ module Net :
 			sig
 				val get_all : string -> 'a -> string list
 				val exists : string -> name:Network_interface.iface -> bool
+				val is_fcoe_supported : string -> name:Network_interface.iface -> bool
 				val get_mac : string -> name:Network_interface.iface -> string
 				val is_up : string -> name:Network_interface.iface -> bool
 				val get_ipv4_addr :
