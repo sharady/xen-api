@@ -317,6 +317,14 @@ module Interface = struct
 			Ethtool.set_offload name params
 		) ()
 
+	let is_fcoe_supported _ dbg ~name =
+		Debug.with_thread_associated dbg (fun () ->
+			let output = Dcbtool.is_fcoe_supported name "on" in
+			if String.has_substr output "Successful"
+				then true
+			else false
+		) ()
+
 	let is_connected _ dbg ~name =
 		Debug.with_thread_associated dbg (fun () ->
 			Sysfs.get_carrier name
