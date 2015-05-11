@@ -282,6 +282,7 @@ let pif_record rpc session_id pif =
 	    string_of_float (value /. 1024.0)
 	  with _ -> "<unknown>") ~expensive:true ();
 	make_field ~name:"carrier" ~get:(fun () -> default nid (may (fun m -> string_of_bool m.API.pIF_metrics_carrier) (xm ()))) ();
+        make_field ~name:"fcoe-supported" ~get:(fun () -> default nid (may (fun m -> string_of_bool m.API.pIF_metrics_fcoe_s    upported) (xm ()))) ();
 	make_field ~name:"vendor-id" ~get:(fun () -> default nid (may (fun m -> m.API.pIF_metrics_vendor_id) (xm ()))) ();
 	make_field ~name:"vendor-name" ~get:(fun () -> default nid (may (fun m -> m.API.pIF_metrics_vendor_name) (xm ()))) ();
 	make_field ~name:"device-id" ~get:(fun () -> default nid (may (fun m -> m.API.pIF_metrics_device_id) (xm ()))) ();

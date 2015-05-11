@@ -4903,6 +4903,7 @@ let pif_metrics =
       [ uid _pif_metrics;
 	namespace ~name:"io" ~contents:iobandwidth ();
 	field ~qualifier:DynamicRO ~ty:Bool "carrier" "Report if the PIF got a carrier or not";
+        field ~qualifier:DynamicRO ~ty:Bool "fcoe_supported" "Report fcoe support";
 	field ~qualifier:DynamicRO ~ty:String "vendor_id" "Report vendor ID";
 	field ~qualifier:DynamicRO ~ty:String "vendor_name" "Report vendor name";
 	field ~qualifier:DynamicRO ~ty:String "device_id" "Report device ID";
