@@ -319,7 +319,7 @@ module Interface = struct
 
 	let is_fcoe_supported _ dbg ~name =
 		Debug.with_thread_associated dbg (fun () ->
-			let output = Dcbtool.is_fcoe_supported name "on" in
+			let output = Dcbtool.is_fcoe_supported name in
 			if String.has_substr output "Successful"
 				then true
 			else false

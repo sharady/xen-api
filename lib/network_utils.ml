@@ -551,8 +551,8 @@ module Dcbtool = struct
 	let call ?(log=false) args =
 		call_script ~log_successful_output:log dcbtool args
 
-	let is_fcoe_supported name value =
-		let output = call ("sc" :: name :: "dcb" :: [value]) in
+	let is_fcoe_supported name =
+		let output = call ["gc"; name; "dcb"] in
 		let filter_output = String.split '\n' output in
 		let status = List.find (fun x -> String.has_substr x "Status" = true) filter_output in
 		status
