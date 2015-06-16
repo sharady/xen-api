@@ -28,6 +28,18 @@ let assert_managed ~__context ~vdi =
   if not (Db.VDI.get_managed ~__context ~self:vdi)
   then raise (Api_errors.Server_error(Api_errors.vdi_not_managed, [ Ref.string_of vdi ]))
 
+(* CA-94283: Block VDI-Destroy operation when HA Enabling/Disabling is in progress *)
+let assert_ha_in_progress ~__context ~vdi =
+  let pool = Helpers.get_pool ~__context in
+  let ha_vdi = Db.VDI.get_name_label ~__context ~self:vdi in
+  if (ha_vdi = "Metadata for HA") || (ha_vdi = "Statefile for HA") then begin
+    let current_ops = Db.Pool.get_current_operations ~__context ~self:pool in
+    if List.exists (fun (_, x) -> x = `ha_enable) current_ops then
+      raise (Api_errors.Server_error (Api_errors.ha_enable_in_progress, [ ]));
+    if List.exists (fun (_, x) -> x = `ha_disable) current_ops then
+      raise (Api_errors.Server_error (Api_errors.ha_disable_in_progress, [ ]))
+  end
+
 (* Database replication to metadata VDIs. *)
 let redo_log_lifecycle_mutex = Mutex.create ()
 
