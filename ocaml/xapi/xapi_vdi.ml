@@ -44,7 +44,7 @@ let check_operation_error ~__context ?(sr_records=[]) ?(pbd_records=[]) ?(vbd_re
 	      has a current_operation itself
 	   5. HA prevents you from deleting statefiles or metadata volumes
 	   *)
-	if List.exists (fun (_, op) -> op <> `copy) current_ops
+       if List.exists (fun (_, op) -> op <> `copy) current_ops
 	then Some(Api_errors.other_operation_in_progress,["VDI"; _ref])
 	else
 		(* check to see whether it's a local cd drive *)
@@ -178,7 +178,7 @@ let check_operation_error ~__context ?(sr_records=[]) ?(pbd_records=[]) ?(vbd_re
 					then Some (Api_errors.sr_operation_not_supported, [Ref.string_of sr])
 					else None
 				| _ -> None
-			)
+                       )
 
 let assert_operation_valid ~__context ~self ~(op:API.vdi_operations) = 
   let pool = Helpers.get_pool ~__context in
@@ -192,7 +192,7 @@ let assert_operation_valid ~__context ~self ~(op:API.vdi_operations) =
 let update_allowed_operations_internal ~__context ~self ~sr_records ~pbd_records ~vbd_records =
   let pool = Helpers.get_pool ~__context in
   let ha_enabled = Db.Pool.get_ha_enabled ~__context ~self:pool in
-
+  
   let all = Db.VDI.get_record_internal ~__context ~self in
   let allowed = 
     let check x = match check_operation_error ~__context ~sr_records ~pbd_records ~vbd_records ha_enabled all self x with None ->  [ x ] | _ -> [] in
@@ -474,6 +474,7 @@ let destroy ~__context ~self =
 	let location = Db.VDI.get_location ~__context ~self in
   Sm.assert_pbd_is_plugged ~__context ~sr;
   Xapi_vdi_helpers.assert_managed ~__context ~vdi:self;
+  Xapi_vdi_helpers.assert_ha_in_progress ~__context ~vdi:self;
 
   let vbds = Db.VDI.get_VBDs ~__context ~self in
   let attached_vbds = List.filter 
