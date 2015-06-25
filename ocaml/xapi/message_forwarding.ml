@@ -653,13 +653,16 @@ module Forward = functor(Local: Custom_actions.CUSTOM_ACTIONS) -> struct
                        let task_id = Ref.string_of (Context.get_task_id __context) in
                        retry_with_global_lock ~__context ~doc
                                (fun () ->
+                                       Xapi_pool_helpers.assert_operation_valid ~__context ~self ~op;
                                        Db.Pool.add_to_current_operations ~__context ~self ~key:task_id ~value:op);
+                                       Xapi_pool_helpers.update_allowed_operations ~__context ~self;
                        (* Then do the action with the lock released *)
                        finally f
                                (* Make sure to clean up at the end *)
                                (fun () ->
                                        try
                                                Db.Pool.remove_from_current_operations ~__context ~self ~key:task_id;
+                                               Xapi_pool_helpers.update_allowed_operations ~__context ~self;
                                                Early_wakeup.broadcast (Datamodel._pool, Ref.string_of self);
                                        with
                                         _ -> ())
