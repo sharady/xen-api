@@ -139,6 +139,10 @@ let check_operation_error ~__context ?(sr_records=[]) ?(pbd_records=[]) ?(vbd_re
 						else
 							if ha_enabled && List.mem record.Db_actions.vDI_type [ `ha_statefile; `redo_log ]
 							then Some (Api_errors.ha_is_enabled, [])
+                                                       else if List.mem record.Db_actions.vDI_type [`ha_statefile; `metadata ] && Xapi_pool_helpers.ha_enable_in_progress ~__context
+                                                       then Some (Api_errors.ha_enable_in_progress, [])
+                                                       else if List.mem record.Db_actions.vDI_type [`ha_statefile; `metadata ] && Xapi_pool_helpers.ha_disable_in_progress ~__context
+                                                       then Some (Api_errors.ha_disable_in_progress, [])
 							else
 								if not Smint.(has_capability Vdi_delete sm_features)
 								then Some (Api_errors.sr_operation_not_supported, [Ref.string_of sr])
@@ -192,7 +196,7 @@ let assert_operation_valid ~__context ~self ~(op:API.vdi_operations) =
 let update_allowed_operations_internal ~__context ~self ~sr_records ~pbd_records ~vbd_records =
   let pool = Helpers.get_pool ~__context in
   let ha_enabled = Db.Pool.get_ha_enabled ~__context ~self:pool in
-  
+
   let all = Db.VDI.get_record_internal ~__context ~self in
   let allowed = 
     let check x = match check_operation_error ~__context ~sr_records ~pbd_records ~vbd_records ha_enabled all self x with None ->  [ x ] | _ -> [] in
@@ -474,7 +478,6 @@ let destroy ~__context ~self =
 	let location = Db.VDI.get_location ~__context ~self in
   Sm.assert_pbd_is_plugged ~__context ~sr;
   Xapi_vdi_helpers.assert_managed ~__context ~vdi:self;
-  Xapi_vdi_helpers.assert_ha_in_progress ~__context ~vdi:self;
 
   let vbds = Db.VDI.get_VBDs ~__context ~self in
   let attached_vbds = List.filter 
