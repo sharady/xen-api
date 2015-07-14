@@ -44,7 +44,7 @@ let check_operation_error ~__context ?(sr_records=[]) ?(pbd_records=[]) ?(vbd_re
 	      has a current_operation itself
 	   5. HA prevents you from deleting statefiles or metadata volumes
 	   *)
-       if List.exists (fun (_, op) -> op <> `copy) current_ops
+	if List.exists (fun (_, op) -> op <> `copy) current_ops
 	then Some(Api_errors.other_operation_in_progress,["VDI"; _ref])
 	else
 		(* check to see whether it's a local cd drive *)
@@ -139,10 +139,10 @@ let check_operation_error ~__context ?(sr_records=[]) ?(pbd_records=[]) ?(vbd_re
 						else
 							if ha_enabled && List.mem record.Db_actions.vDI_type [ `ha_statefile; `redo_log ]
 							then Some (Api_errors.ha_is_enabled, [])
-                                                       else if List.mem record.Db_actions.vDI_type [`ha_statefile; `metadata ] && Xapi_pool_helpers.ha_enable_in_progress ~__context
-                                                       then Some (Api_errors.ha_enable_in_progress, [])
-                                                       else if List.mem record.Db_actions.vDI_type [`ha_statefile; `metadata ] && Xapi_pool_helpers.ha_disable_in_progress ~__context
-                                                       then Some (Api_errors.ha_disable_in_progress, [])
+							else if List.mem record.Db_actions.vDI_type [`ha_statefile; `metadata ] && Xapi_pool_helpers.ha_enable_in_progress ~__context
+							then Some (Api_errors.ha_enable_in_progress, [])
+							else if List.mem record.Db_actions.vDI_type [`ha_statefile; `metadata ] && Xapi_pool_helpers.ha_disable_in_progress ~__context
+							then Some (Api_errors.ha_disable_in_progress, [])
 							else
 								if not Smint.(has_capability Vdi_delete sm_features)
 								then Some (Api_errors.sr_operation_not_supported, [Ref.string_of sr])
@@ -182,7 +182,7 @@ let check_operation_error ~__context ?(sr_records=[]) ?(pbd_records=[]) ?(vbd_re
 					then Some (Api_errors.sr_operation_not_supported, [Ref.string_of sr])
 					else None
 				| _ -> None
-                       )
+			)
 
 let assert_operation_valid ~__context ~self ~(op:API.vdi_operations) = 
   let pool = Helpers.get_pool ~__context in
