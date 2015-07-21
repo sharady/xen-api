@@ -457,11 +457,19 @@ let snapshot ~__context ~vdi ~driver_params =
 		(fun () ->
 			try
 				snapshot_and_clone C.VDI.snapshot ~__context ~vdi ~driver_params
-			with Storage_interface.Unimplemented _ ->
-				(* CA-28598 *)
-				debug "Backend reported not implemented despite it offering the feature; assuming this is an LVHD upgrade issue";
-				raise (Api_errors.Server_error(Api_errors.sr_requires_upgrade, [ Ref.string_of (Db.VDI.get_SR ~__context ~self:vdi) ]))
-		) in
+			with e ->
+			begin match e with
+				| Storage_interface.Unimplemented _ ->
+					(* CA-28598 *)
+					debug "Backend reported not implemented despite it offering the feature; assuming this is an LVHD upgrade issue";
+					raise (Api_errors.Server_error(Api_errors.sr_requires_upgrade, [Ref.string_of (Db.VDI.get_SR ~__context ~self:vdi)]))
+				| Storage_interface.Inapplicable _ ->
+					debug "Backend reported inapplicable operation on the SR";
+					raise (Api_errors.Server_error(Api_errors.sr_inapplicable_operation, [Ref.string_of (Db.VDI.get_SR ~__context ~self:vdi						)]))
+				| _ -> raise e
+			end;
+		)
+	in
 	(* Record the fact this is a snapshot *)
 	Db.VDI.set_is_a_snapshot ~__context ~self:newvdi ~value:true;
 	Db.VDI.set_snapshot_of ~__context ~self:newvdi ~value:vdi;
@@ -532,8 +540,12 @@ let clone ~__context ~vdi ~driver_params =
 	try
 		let module C = Storage_interface.Client(struct let rpc = Storage_access.rpc end) in
 		snapshot_and_clone C.VDI.clone ~__context ~vdi ~driver_params
-	with Storage_interface.Unimplemented _ ->
-    debug "Backend does not implement VDI clone: doing it ourselves";
+	with e ->
+	begin match e with
+		| Storage_interface.Unimplemented _ -> debug "Backend does not implement VDI clone: doing it ourselves"
+		| Storage_interface.Inapplicable _ -> debug "Backend claims inapplicable operation: doing it ourselves"
+		| _ -> debug "Unkown backend error while VDI clone: doing it ourselves"
+	end;
 	let a = Db.VDI.get_record_internal ~__context ~self:vdi in
     let newvdi = create ~__context 
       ~name_label:a.Db_actions.vDI_name_label
