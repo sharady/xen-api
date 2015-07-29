@@ -3749,7 +3749,12 @@ module Forward = functor(Local: Custom_actions.CUSTOM_ACTIONS) -> struct
 				Helpers.call_api_functions ~__context
 					(fun rpc session_id ->
 						Client.SR.update rpc session_id sr
-					)
+					);
+
+				(* Attach SR-stats VDI if SR has stats capability *)
+				let sm_config = Db.SR.get_sm_config ~__context ~self:sr in
+				if (List.mem_assoc "SR_STATS" sm_config) then (* Need to confirm this condition and delete this comment *)
+					Xapi_vdi_helpers.attach_rrd_vdi ~__context ~sr:sr
 
 		let unplug ~__context ~self =
 			info "PBD.unplug: PBD = '%s'" (pbd_uuid ~__context self);

@@ -23,6 +23,19 @@ open Threadext
 module D=Debug.Make(struct let name="xapi" end)
 open D
 
+let attach_rrd_vdi ~__context ~sr=
+	let vdis = Db.SR.get_VDIs ~__context ~self:sr in
+	let vdi =
+		if (List.exists (fun vdi -> (Db.VDI.get_type ~__context ~self:vdi) = `rrd) vdis) then
+			List.hd (List.filter (fun vdi -> Db.VDI.get_type ~__context ~self:vdi = `rrd) vdis)
+		else begin
+			Helpers.call_api_functions ~__context (fun rpc session_id -> Client.VDI.create ~rpc ~session_id
+				~name_label:"SR-stats VDI" ~name_description:"Disk stores SR-level RRDs" ~sR:sr ~virtual_size:(Int64.of_int 4194304)
+				~_type:`rrd ~sharable:false ~read_only:false ~other_config:[] ~xenstore_data:[] ~sm_config:[] ~tags:[])
+		end;
+	in
+	debug "SR-stats VDI created vdi=%s" (Ref.string_of vdi)
+
 (* CA-26514: Block operations on 'unmanaged' VDIs *)
 let assert_managed ~__context ~vdi = 
   if not (Db.VDI.get_managed ~__context ~self:vdi)
