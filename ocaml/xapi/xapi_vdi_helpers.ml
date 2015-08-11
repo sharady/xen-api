@@ -23,6 +23,87 @@ open Threadext
 module D=Debug.Make(struct let name="xapi" end)
 open D
 
+(* Attach the rrd-stats vdi to dom0 and get the device *)
+let get_rrd_vdi_device ~__context ~vdi =
+	let open Db_filter_types in
+	let vbds = Db.VBD.get_refs_where ~__context ~expr:(And (
+		Eq (Field "VDI", Literal (Ref.string_of vdi)),
+		Eq (Field "currently_attached", Literal "true"))
+	) in
+	let (vbd, device) =
+		match vbds with
+		| vbd :: _ -> (vbd, Db.VBD.get_device ~__context ~self:vbd)
+		| [] -> begin
+			let dom0 = Helpers.get_domain_zero ~__context in
+			let vbd = Helpers.call_api_functions ~__context (fun rpc session_id ->
+				Client.VBD.create ~rpc ~session_id ~vM:dom0 ~vDI:vdi ~mode:`RW ~_type:`Disk
+				~empty:false ~userdevice:"autodetect" ~bootable:false ~unpluggable:true
+				~qos_algorithm_type:"" ~qos_algorithm_params:[] ~other_config:[] )
+			in
+			Helpers.call_api_functions ~__context (fun rpc session_id ->
+				Client.VBD.plug ~rpc ~session_id ~self:vbd);
+			(vbd, Db.VBD.get_device ~__context ~self:vbd)
+		end
+	in
+	(vbd, device)
+
+(* Detach the rrd-stats vdi *)
+let detach_rrd_vdi ~__context ~vbd =
+	Helpers.call_api_functions ~__context (fun rpc session_id ->
+		Client.VBD.unplug ~rpc ~session_id ~self:vbd);
+	Helpers.call_api_functions ~__context (fun rpc session_id ->
+		Client.VBD.destroy ~rpc ~session_id ~self:vbd)
+
+(* Construct the CStruct for the rrd-stats vdi *)
+let open_rrd_file ~device ~mode =
+	let path = "/dev/" ^ device in
+	let fd = Unix.openfile path mode 0 in
+	let size = 4194304 in
+	let mapping = Bigarray.(Array1.map_file fd char c_layout true size) in
+	Unix.close fd;
+	let cstruct = Cstruct.of_bigarray mapping in
+	cstruct
+
+let format_rrd_vdi ~cstruct ~magic_number =
+	let version = 1 and length = 0 in
+	Cstruct.BE.set_uint32 cstruct 0 magic_number;
+	Cstruct.BE.set_uint32 cstruct 4 (Int32.of_int version);
+	Cstruct.BE.set_uint32 cstruct 8 (Int32.of_int length)
+
+(* Write the rrd stats to the rrd-stats vdi *)
+let write_rrd ~__context ~sr ~vdi ~text =
+	let magic_number = (Int32.of_int 0x7ada7ada) in
+	let (vbd, device) = get_rrd_vdi_device ~__context ~vdi in
+	let cstruct = open_rrd_file ~device ~mode:[Unix.O_RDWR] in
+	if (Cstruct.BE.get_uint32 cstruct 0) <>  magic_number then
+		format_rrd_vdi ~cstruct:cstruct ~magic_number:magic_number;
+	let curr_len = Int32.to_int (Cstruct.BE.get_uint32 cstruct 8) in
+	let text_len = String.length text in
+	let buff = String.make curr_len '\000' in
+	Cstruct.blit_to_string cstruct 12 buff 0 curr_len;
+	Cstruct.BE.set_uint32 cstruct 8 (Int32.of_int (curr_len + text_len));
+	Cstruct.blit_from_string (buff ^ text) 0 cstruct 12 (curr_len + text_len);
+	detach_rrd_vdi ~__context ~vbd:vbd
+
+let read_rrd ~__context ~sr ~vdi =
+	let magic_number = (Int32.of_int 0x7ada7ada) in
+	let (vbd, device) = get_rrd_vdi_device ~__context ~vdi in
+	let cstruct = open_rrd_file ~device ~mode:[Unix.O_RDWR] in
+	let output =
+		if (Cstruct.BE.get_uint32 cstruct 0) <> magic_number then begin
+			format_rrd_vdi ~cstruct:cstruct ~magic_number:magic_number;
+			""
+		end
+		else begin
+			let len = Int32.to_int (Cstruct.BE.get_uint32 cstruct 8) in
+			let buff = String.make len '\000' in
+			Cstruct.blit_to_string cstruct 12 buff 0 len;
+			buff
+		end
+	in
+	detach_rrd_vdi ~__context ~vbd:vbd;
+	output
+
 let create_rrd_vdi ~__context ~sr =
 	let open Db_filter_types in
 	match Db.VDI.get_refs_where ~__context ~expr:(And (
