@@ -15,6 +15,8 @@
  * @group XenAPI functions
  *)
 
+module Rrdd = Rrd_client.Client
+
 open Printf
 open Threadext
 open Pervasiveext
@@ -125,6 +127,28 @@ let scanning_thread () = Debug.with_thread_named "scanning_thread" (fun () ->
 			Thread.delay (get_delay ());
 			try scan_all ~__context
 			with e -> debug "Exception in SR scanning thread: %s" (Printexc.to_string e)
+		done)
+	) ()
+
+let update_physical_utilisation ~__context =
+	let srs = get_all_plugged_srs ~__context in
+	(* Filter the SRs which have SR_STATS capability *)
+	let rrd_srs = List.filter (fun sr ->
+		let sr_record = Db.SR.get_record_internal ~__context ~self:sr in
+		Smint.(has_capability Sr_stats (Xapi_sr_operations.features_of_sr ~__context sr_record))
+		) srs
+	in
+	(* Update the physical utilisation db field of SRs *)
+	List.iter (fun sr ->
+		let new_value = Rrdd.query_sr_ds ~sr_uuid:(Db.SR.get_uuid ~__context ~self:sr) ~ds_name:"physical_utilisation" in
+		Db.SR.set_physical_utilisation ~__context ~self:sr ~value:(Int64.of_float new_value)) rrd_srs
+
+let physical_utilisation_thread () = Debug.with_thread_named "physical_utilisation_thread" (fun () ->
+	Server_helpers.exec_with_new_task "SR physical utilisation" (fun __context ->
+		while true do
+			Thread.delay 120. ;
+			try update_physical_utilisation ~__context
+			with e -> debug "Exception in SR physical utilisation scanning thread: %s" (Printexc.to_string e)
 		done)
 	) ()
 
