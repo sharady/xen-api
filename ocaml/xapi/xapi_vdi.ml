@@ -758,4 +758,90 @@ let read_database_pool_uuid ~__context ~self =
 	| Some (_, uuid) -> uuid
 	| None -> ""
 
+(* Detach the rrd-stats vdi *)
+let detach_rrd_vdi ~__context ~vbd =
+	Helpers.call_api_functions ~__context (fun rpc session_id ->
+		Client.VBD.unplug ~rpc ~session_id ~self:vbd);
+	Helpers.call_api_functions ~__context (fun rpc session_id ->
+		Client.VBD.destroy ~rpc ~session_id ~self:vbd)
+
+(* Set the unsigned int at an offset *)
+let set_cstruct_int cstruct offset num =
+	Cstruct.BE.set_uint32 cstruct offset num
+
+(* Get the unsigned int from an offset *)
+let get_cstruct_int cstruct offset =
+	Cstruct.BE.get_uint32 cstruct offset
+
+(* Read the string from an offset of specified length *)
+let read_string cstruct offset len =
+	let curr_text = String.make len '\000' in
+	Cstruct.blit_to_string cstruct offset curr_text 0 len;
+	curr_text
+
+(* Write the string to an offset of specified length *)
+let write_string cstruct offset text len =
+	Cstruct.blit_from_string text 0 cstruct offset len
+
+let format_rrd_vdi ~cstruct =
+	let magic_number = (0x7ada7adal) and version = 1l in
+	set_cstruct_int cstruct 0 magic_number;
+	set_cstruct_int cstruct 4 version
+
+(* Attach the rrd-stats vdi to dom0 and get the device *)
+let get_rrd_vdi_device ~__context ~vdi =
+	let open Db_filter_types in
+	let vbds = Db.VBD.get_refs_where ~__context ~expr:(And (
+		Eq (Field "VDI", Literal (Ref.string_of vdi)),
+		Eq (Field "currently_attached", Literal "true"))
+	) in
+	match vbds with
+	| vbd :: _ -> (vbd, Db.VBD.get_device ~__context ~self:vbd)
+	| [] -> begin
+		let dom0 = Helpers.get_domain_zero ~__context in
+		let vbd = Helpers.call_api_functions ~__context (fun rpc session_id ->
+			Client.VBD.create ~rpc ~session_id ~vM:dom0 ~vDI:vdi ~mode:`RW ~_type:`Disk
+			~empty:false ~userdevice:"autodetect" ~bootable:false ~unpluggable:true
+			~qos_algorithm_type:"" ~qos_algorithm_params:[] ~other_config:[] )
+		in
+		Helpers.call_api_functions ~__context (fun rpc session_id ->
+			Client.VBD.plug ~rpc ~session_id ~self:vbd);
+			(vbd, Db.VBD.get_device ~__context ~self:vbd)
+		end
+
+(* Construct the CStruct for the rrd-stats vdi *)
+let open_rrd_file ~__context ~mode ~vdi =
+	let (vbd, device) = get_rrd_vdi_device ~__context ~vdi in
+	let path = "/dev/" ^ device in
+	let fd = Unix.openfile path mode 0 in
+	let size = 4194304 in
+	let mapping = Bigarray.(Array1.map_file fd char c_layout true size) in
+	Unix.close fd;
+	let cstruct = Cstruct.of_bigarray mapping in
+	if (get_cstruct_int cstruct 0) <> (0x7ada7adal) then
+		format_rrd_vdi ~cstruct:cstruct;
+	(cstruct, vbd)
+
+(* Write the rrd stats to the rrd-stats vdi *)
+let write_rrd ~__context ~sr ~vdi ~text =
+	let (cstruct, vbd) = open_rrd_file ~__context ~mode:[Unix.O_RDWR] ~vdi in
+	if (get_cstruct_int cstruct 0) <> (0x7ada7adal) then
+		format_rrd_vdi ~cstruct:cstruct;
+	let text_len = String.length text in
+	if text_len >= (4194304 - 12) then (* 12bytes reserved for the VDI format *)
+		raise (Api_errors.Server_error(Api_errors.vdi_out_of_space, [ Ref.string_of vdi ]));
+	set_cstruct_int cstruct 8 (Int32.of_int text_len);
+	write_string cstruct 12 text text_len;
+	detach_rrd_vdi ~__context ~vbd:vbd
+
+(* Read the rrd stats from the rrd-stats vdi *)
+let read_rrd ~__context ~sr ~vdi =
+	let (cstruct, vbd) = open_rrd_file ~__context ~mode:[Unix.O_RDWR] ~vdi in
+	if (get_cstruct_int cstruct 0) <> (0x7ada7adal) then
+		raise (Api_errors.Server_error(Api_errors.vdi_not_formatted, [ Ref.string_of vdi ]));
+	let len = Int32.to_int (get_cstruct_int cstruct 8) in
+	let curr_text = read_string cstruct 12 len in
+	detach_rrd_vdi ~__context ~vbd:vbd;
+	curr_text
+
 (* let pool_migrate = "See Xapi_vm_migrate.vdi_pool_migrate!" *)
