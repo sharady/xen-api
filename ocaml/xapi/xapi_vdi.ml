@@ -839,3 +839,4 @@ let read_rrd ~__context ~sr ~vdi =
 		)
 
 (* let pool_migrate = "See Xapi_vm_migrate.vdi_pool_migrate!" *)
+

@@ -3122,6 +3122,25 @@ let vdi_resize_online = call
   ~allowed_roles:_R_VM_ADMIN
   ()
 
+let vdi_write_rrd = call
+  ~name:"write_rrd"
+  ~in_oss_since:None
+  ~in_product_since:rel_rio
+  ~params:[Ref _sr, "sr", "The SR reference"; Ref _vdi, "vdi", "The VDI to write rrd"; String, "text", "String to be written" ]
+  ~doc:"Write the RRD to rrd-stats VDI."
+  ~allowed_roles:_R_VM_ADMIN
+  ()
+
+let vdi_read_rrd = call
+  ~name:"read_rrd"
+  ~in_oss_since:None
+  ~in_product_since:rel_rio
+  ~params:[Ref _sr, "sr", "The SR reference"; Ref _vdi, "vdi", "The VDI to write rrd" ]
+  ~doc:"Read the RRD to rrd-stats VDI."
+  ~result:(String, "The RRD stats in VDI")
+  ~allowed_roles:_R_VM_ADMIN
+  ()
+
 let vdi_copy = call
   ~name:"copy"
   ~lifecycle:[
@@ -5849,6 +5868,8 @@ let vdi =
       ~messages_default_allowed_roles:_R_VM_ADMIN
       ~messages:[vdi_snapshot; vdi_clone; vdi_resize; 
 		 vdi_resize_online;
+		 vdi_write_rrd;
+		 vdi_read_rrd;
 		 vdi_introduce; vdi_pool_introduce;
 		 vdi_db_introduce; vdi_db_forget;
 		 vdi_update;

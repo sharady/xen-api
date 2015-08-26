@@ -59,7 +59,7 @@ COMMON = \
 
 #OCamlProgram(upload_receive, $(COMMON) fileupload upload_receive)
 
-OCamlProgram(quicktestbin, quicktest quicktest_common quicktest_ocamltest quicktest_storage quicktest_http quicktest_vdi_copy quicktest_encodings quicktest_vm_placement vm_placement quicktest_vm_memory_constraints ../util/vm_memory_constraints quicktest_lifecycle sparse_encoding)
+OCamlProgram(quicktestbin, quicktest quicktest_common quicktest_ocamltest quicktest_storage quicktest_http quicktest_vdi_copy quicktest_vdi_read_write quicktest_encodings quicktest_vm_placement vm_placement quicktest_vm_memory_constraints ../util/vm_memory_constraints quicktest_lifecycle sparse_encoding)
 
 OCamlProgram(xenstore_copy, xenstore_dump xenstore_copy)
 

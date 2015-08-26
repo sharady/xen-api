@@ -3475,6 +3475,14 @@ module Forward = functor(Local: Custom_actions.CUSTOM_ACTIONS) -> struct
 					forward_vdi_op ~local_fn ~__context ~self:vdi
 						(fun session_id rpc -> Client.VDI.resize rpc session_id vdi size))
 
+		let write_rrd ~__context ~sr ~vdi ~text =
+			info "VDI.write_rrd: VDI = '%s'; text = %s" (vdi_uuid ~__context vdi) text;
+			Local.VDI.write_rrd ~__context ~sr ~vdi ~text
+
+		let read_rrd ~__context ~sr ~vdi =
+			info "VDI.write_rrd: VDI = '%s'" (vdi_uuid ~__context vdi);
+			Local.VDI.read_rrd ~__context ~sr ~vdi
+
 		let resize_online ~__context ~vdi ~size =
 			info "VDI.resize_online: VDI = '%s'; size = %Ld" (vdi_uuid ~__context vdi) size;
 			let local_fn = Local.VDI.resize_online ~vdi ~size in
