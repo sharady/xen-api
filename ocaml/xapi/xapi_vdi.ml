@@ -758,90 +758,81 @@ let read_database_pool_uuid ~__context ~self =
 	| Some (_, uuid) -> uuid
 	| None -> ""
 
-(* Detach the rrd-stats vdi *)
-let detach_rrd_vdi ~__context ~vbd =
-	Helpers.call_api_functions ~__context (fun rpc session_id ->
-		Client.VBD.unplug ~rpc ~session_id ~self:vbd);
-	Helpers.call_api_functions ~__context (fun rpc session_id ->
-		Client.VBD.destroy ~rpc ~session_id ~self:vbd)
+module VDI_CStruct = struct
 
-(* Set the unsigned int at an offset *)
-let set_cstruct_int cstruct offset num =
-	Cstruct.BE.set_uint32 cstruct offset num
+	let magic_number = 0x7ada7adal
+	let magic_number_offset = 0
+	let version = 1l
+	let version_offset = 4
+	let length_offset = 8
+	let data_offset = 12
+	let vdi_format_length = 12 (* VDI format takes 12bytes *)
+	let vdi_size = 4194304 (* 4MiB *)
+	let default_offset = 0
 
-(* Get the unsigned int from an offset *)
-let get_cstruct_int cstruct offset =
-	Cstruct.BE.get_uint32 cstruct offset
+	(* Set the magic number *)
+	let set_magic_number cstruct =
+		Cstruct.BE.set_uint32 cstruct magic_number_offset magic_number
 
-(* Read the string from an offset of specified length *)
-let read_string cstruct offset len =
-	let curr_text = String.make len '\000' in
-	Cstruct.blit_to_string cstruct offset curr_text 0 len;
-	curr_text
+	(* Get the magic number *)
+	let get_magic_number cstruct =
+		Cstruct.BE.get_uint32 cstruct magic_number_offset
 
-(* Write the string to an offset of specified length *)
-let write_string cstruct offset text len =
-	Cstruct.blit_from_string text 0 cstruct offset len
+	(* Set the version *)
+	let set_version cstruct =
+		Cstruct.BE.set_uint32 cstruct version_offset version
 
-let format_rrd_vdi ~cstruct =
-	let magic_number = (0x7ada7adal) and version = 1l in
-	set_cstruct_int cstruct 0 magic_number;
-	set_cstruct_int cstruct 4 version
+	(* Set the data length *)
+	let set_data_length cstruct len =
+		Cstruct.BE.set_uint32 cstruct length_offset len
 
-(* Attach the rrd-stats vdi to dom0 and get the device *)
-let get_rrd_vdi_device ~__context ~vdi =
-	let open Db_filter_types in
-	let vbds = Db.VBD.get_refs_where ~__context ~expr:(And (
-		Eq (Field "VDI", Literal (Ref.string_of vdi)),
-		Eq (Field "currently_attached", Literal "true"))
-	) in
-	match vbds with
-	| vbd :: _ -> (vbd, Db.VBD.get_device ~__context ~self:vbd)
-	| [] -> begin
-		let dom0 = Helpers.get_domain_zero ~__context in
-		let vbd = Helpers.call_api_functions ~__context (fun rpc session_id ->
-			Client.VBD.create ~rpc ~session_id ~vM:dom0 ~vDI:vdi ~mode:`RW ~_type:`Disk
-			~empty:false ~userdevice:"autodetect" ~bootable:false ~unpluggable:true
-			~qos_algorithm_type:"" ~qos_algorithm_params:[] ~other_config:[] )
-		in
-		Helpers.call_api_functions ~__context (fun rpc session_id ->
-			Client.VBD.plug ~rpc ~session_id ~self:vbd);
-			(vbd, Db.VBD.get_device ~__context ~self:vbd)
-		end
+	(* Get the data length *)
+	let get_data_length cstruct =
+		Cstruct.BE.get_uint32 cstruct length_offset
 
-(* Construct the CStruct for the rrd-stats vdi *)
-let open_rrd_file ~__context ~mode ~vdi =
-	let (vbd, device) = get_rrd_vdi_device ~__context ~vdi in
-	let path = "/dev/" ^ device in
-	let fd = Unix.openfile path mode 0 in
-	let size = 4194304 in
-	let mapping = Bigarray.(Array1.map_file fd char c_layout true size) in
-	Unix.close fd;
-	let cstruct = Cstruct.of_bigarray mapping in
-	if (get_cstruct_int cstruct 0) <> (0x7ada7adal) then
-		format_rrd_vdi ~cstruct:cstruct;
-	(cstruct, vbd)
+	(* Write the string to the vdi *)
+	let write_to_vdi cstruct text text_len =
+		Cstruct.blit_from_string text default_offset cstruct data_offset text_len;
+		set_data_length cstruct (Int32.of_int text_len)
+
+	(* Read the string from the vdi *)
+	let read_from_vdi cstruct =
+		let curr_len = Int32.to_int (get_data_length cstruct) in
+		let curr_text = String.make curr_len '\000' in
+		Cstruct.blit_to_string cstruct data_offset curr_text default_offset curr_len;
+		curr_text
+
+	(* Format the vdi for the first time *)
+	let format_rrd_vdi cstruct =
+		set_magic_number cstruct;
+		set_version cstruct
+
+end
+
+let op_on_device device =
+	let fd = Unix.openfile device [Unix.O_RDWR] 0 in
+	let mapping = Bigarray.(Array1.map_file fd char c_layout true VDI_CStruct.vdi_size) in
+	Cstruct.of_bigarray mapping
+
+let open_rrd_vdi ~__context vdi =
+	Helpers.call_api_functions ~__context
+		(fun rpc session_id -> Sm_fs_ops.with_block_attached_device  __context rpc session_id vdi `RW op_on_device)
 
 (* Write the rrd stats to the rrd-stats vdi *)
 let write_rrd ~__context ~sr ~vdi ~text =
-	let (cstruct, vbd) = open_rrd_file ~__context ~mode:[Unix.O_RDWR] ~vdi in
-	if (get_cstruct_int cstruct 0) <> (0x7ada7adal) then
-		format_rrd_vdi ~cstruct:cstruct;
-	let text_len = String.length text in
-	if text_len >= (4194304 - 12) then (* 12bytes reserved for the VDI format *)
+	let cstruct = open_rrd_vdi ~__context vdi in
+	if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
+		VDI_CStruct.format_rrd_vdi cstruct;
+	let new_text_len = String.length text in
+	if new_text_len >= (VDI_CStruct.vdi_size - VDI_CStruct.vdi_format_length) then
 		raise (Api_errors.Server_error(Api_errors.vdi_out_of_space, [ Ref.string_of vdi ]));
-	set_cstruct_int cstruct 8 (Int32.of_int text_len);
-	write_string cstruct 12 text text_len;
-	detach_rrd_vdi ~__context ~vbd:vbd
+	VDI_CStruct.write_to_vdi cstruct text new_text_len
 
 (* Read the rrd stats from the rrd-stats vdi *)
 let read_rrd ~__context ~sr ~vdi =
-	let (cstruct, vbd) = open_rrd_file ~__context ~mode:[Unix.O_RDWR] ~vdi in
-	if (get_cstruct_int cstruct 0) <> (0x7ada7adal) then
+	let cstruct = open_rrd_vdi ~__context vdi in
+	if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
 		raise (Api_errors.Server_error(Api_errors.vdi_not_formatted, [ Ref.string_of vdi ]));
-	let len = Int32.to_int (get_cstruct_int cstruct 8) in
-	let curr_text = read_string cstruct 12 len in
-	detach_rrd_vdi ~__context ~vbd:vbd;
-	curr_text
+	VDI_CStruct.read_from_vdi cstruct
 
 (* let pool_migrate = "See Xapi_vm_migrate.vdi_pool_migrate!" *)
