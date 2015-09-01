@@ -814,25 +814,31 @@ let op_on_device device =
 	let mapping = Bigarray.(Array1.map_file fd char c_layout true VDI_CStruct.vdi_size) in
 	Cstruct.of_bigarray mapping
 
-let open_rrd_vdi ~__context vdi =
-	Helpers.call_api_functions ~__context
-		(fun rpc session_id -> Sm_fs_ops.with_block_attached_device  __context rpc session_id vdi `RW op_on_device)
-
 (* Write the rrd stats to the rrd-stats vdi *)
 let write_rrd ~__context ~sr ~vdi ~text =
-	let cstruct = open_rrd_vdi ~__context vdi in
-	if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
-		VDI_CStruct.format_rrd_vdi cstruct;
-	let new_text_len = String.length text in
-	if new_text_len >= (VDI_CStruct.vdi_size - VDI_CStruct.vdi_format_length) then
-		raise (Api_errors.Server_error(Api_errors.vdi_out_of_space, [ Ref.string_of vdi ]));
-	VDI_CStruct.write_to_vdi cstruct text new_text_len
+	Helpers.call_api_functions ~__context
+		(fun rpc session_id -> Sm_fs_ops.with_block_attached_device  __context rpc session_id vdi `RW
+			(fun device ->
+				let cstruct = op_on_device device in
+				if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
+					VDI_CStruct.format_rrd_vdi cstruct;
+				let new_text_len = String.length text in
+				if new_text_len >= (VDI_CStruct.vdi_size - VDI_CStruct.vdi_format_length) then
+					raise (Api_errors.Server_error(Api_errors.vdi_out_of_space, [ Ref.string_of vdi ]));
+				VDI_CStruct.write_to_vdi cstruct text new_text_len
+			)
+		)
 
 (* Read the rrd stats from the rrd-stats vdi *)
 let read_rrd ~__context ~sr ~vdi =
-	let cstruct = open_rrd_vdi ~__context vdi in
-	if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
-		raise (Api_errors.Server_error(Api_errors.vdi_not_formatted, [ Ref.string_of vdi ]));
-	VDI_CStruct.read_from_vdi cstruct
+	Helpers.call_api_functions ~__context
+		(fun rpc session_id -> Sm_fs_ops.with_block_attached_device  __context rpc session_id vdi `RW
+			(fun device ->
+				let cstruct = op_on_device device in
+				if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
+					raise (Api_errors.Server_error(Api_errors.vdi_not_formatted, [ Ref.string_of vdi ]));
+				VDI_CStruct.read_from_vdi cstruct
+			)
+		)
 
 (* let pool_migrate = "See Xapi_vm_migrate.vdi_pool_migrate!" *)
