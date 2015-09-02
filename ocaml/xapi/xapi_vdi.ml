@@ -809,17 +809,13 @@ module VDI_CStruct = struct
 
 end
 
-let op_on_device device =
-	let fd = Unix.openfile device [Unix.O_RDWR] 0 in
-	let mapping = Bigarray.(Array1.map_file fd char c_layout true VDI_CStruct.vdi_size) in
-	Cstruct.of_bigarray mapping
-
 (* Write the rrd stats to the rrd-stats vdi *)
 let write_rrd ~__context ~sr ~vdi ~text =
 	Helpers.call_api_functions ~__context
-		(fun rpc session_id -> Sm_fs_ops.with_block_attached_device  __context rpc session_id vdi `RW
-			(fun device ->
-				let cstruct = op_on_device device in
+		(fun rpc session_id -> Sm_fs_ops.with_open_block_attached_device __context rpc session_id vdi `RW
+			(fun fd ->
+				let mapping = Bigarray.(Array1.map_file fd char c_layout true VDI_CStruct.vdi_size) in
+				let cstruct = Cstruct.of_bigarray mapping in
 				if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
 					VDI_CStruct.format_rrd_vdi cstruct;
 				let new_text_len = String.length text in
@@ -832,9 +828,10 @@ let write_rrd ~__context ~sr ~vdi ~text =
 (* Read the rrd stats from the rrd-stats vdi *)
 let read_rrd ~__context ~sr ~vdi =
 	Helpers.call_api_functions ~__context
-		(fun rpc session_id -> Sm_fs_ops.with_block_attached_device  __context rpc session_id vdi `RW
-			(fun device ->
-				let cstruct = op_on_device device in
+		(fun rpc session_id -> Sm_fs_ops.with_open_block_attached_device  __context rpc session_id vdi `RW
+			(fun fd ->
+				let mapping = Bigarray.(Array1.map_file fd char c_layout true VDI_CStruct.vdi_size) in
+				let cstruct = Cstruct.of_bigarray mapping in
 				if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
 					raise (Api_errors.Server_error(Api_errors.vdi_not_formatted, [ Ref.string_of vdi ]));
 				VDI_CStruct.read_from_vdi cstruct

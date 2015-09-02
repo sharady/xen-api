@@ -984,9 +984,9 @@ let _ =
   error Api_errors.vdi_not_in_map [ "vdi" ]
     ~doc:"This VDI was not mapped to a destination SR in VM.migrate_send operation" () ;
   error Api_errors.vdi_out_of_space [ "vdi" ]
-    ~doc:"This VDI is out space to write any more data" () ;
+    ~doc:"This VDI is out of space" () ;
   error Api_errors.vdi_not_formatted [ "vdi" ]
-    ~doc:"This VDI is not formatted to read or write any data" () ;
+    ~doc:"This VDI is not formatted" () ;
   error Api_errors.vdi_copy_failed []
     ~doc:"The VDI copy action has failed" ();
 	error Api_errors.vdi_on_boot_mode_incompatible_with_operation []
