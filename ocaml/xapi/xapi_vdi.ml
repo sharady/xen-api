@@ -820,21 +820,26 @@ let write_rrd ~__context ~sr ~vdi ~text =
 					VDI_CStruct.format_rrd_vdi cstruct;
 				let new_text_len = String.length text in
 				if new_text_len >= (VDI_CStruct.vdi_size - VDI_CStruct.vdi_format_length) then
-					raise (Api_errors.Server_error(Api_errors.vdi_out_of_space, [ Ref.string_of vdi ]));
-				VDI_CStruct.write_to_vdi cstruct text new_text_len
+					error "Failure on rrd-stats vdi write, text length is more than 4MiB"
+				else
+					VDI_CStruct.write_to_vdi cstruct text new_text_len
 			)
 		)
 
 (* Read the rrd stats from the rrd-stats vdi *)
 let read_rrd ~__context ~sr ~vdi =
 	Helpers.call_api_functions ~__context
-		(fun rpc session_id -> Sm_fs_ops.with_open_block_attached_device  __context rpc session_id vdi `RW
+		(fun rpc session_id -> Sm_fs_ops.with_open_block_attached_device  __context rpc session_id vdi `RO
 			(fun fd ->
-				let mapping = Bigarray.(Array1.map_file fd char c_layout true VDI_CStruct.vdi_size) in
+				let mapping = Bigarray.(Array1.map_file fd char c_layout false (-1)) in
 				let cstruct = Cstruct.of_bigarray mapping in
-				if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then
-					raise (Api_errors.Server_error(Api_errors.vdi_not_formatted, [ Ref.string_of vdi ]));
-				VDI_CStruct.read_from_vdi cstruct
+				if (VDI_CStruct.get_magic_number cstruct) <> VDI_CStruct.magic_number then begin
+					error "Failure on rrd-stats vdi read, vdi is not formatted";
+					(* Nothing to return, VDI is not formatted *)
+					""
+				end
+				else
+					VDI_CStruct.read_from_vdi cstruct
 			)
 		)
 
