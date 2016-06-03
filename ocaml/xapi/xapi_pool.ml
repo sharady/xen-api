@@ -842,7 +842,6 @@ let eject ~__context ~host =
 
 		write_first_boot_management_interface_configuration_file ();
 
-		Net.reset_state ();
 		Xapi_inventory.update Xapi_inventory._current_interfaces "";
 
 		debug "Pool.eject: deleting Host record (the point of no return)";

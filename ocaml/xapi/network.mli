@@ -2,7 +2,6 @@ module Net :
 	sig
 		val reopen_logs : 'a -> bool
 		val clear_state : 'a -> unit
-		val reset_state : 'a -> unit
 		val set_gateway_interface :
 			string -> name:Network_interface.iface -> unit
 		val set_dns_interface :
