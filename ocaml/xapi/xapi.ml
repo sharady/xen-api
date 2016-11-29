@@ -532,6 +532,7 @@ let check_network_reset () =
          let args = String.split '\n' reset_file in
          let args = List.map (fun s -> match (String.split '=' s) with k :: [v] -> k, v | _ -> "", "") args in
          let device = List.assoc "DEVICE" args in
+         let vlan = if List.mem_assoc "VLAN" args then Some (List.assoc "VLAN" args) else None in
          let mode = match List.assoc "MODE" args with
            | "static" -> `Static
            | "dhcp" | _ -> `DHCP
@@ -557,7 +558,16 @@ let check_network_reset () =
            )) in
          match pifs with
          | [] -> error "management PIF %s not found" device
-         | pif :: _ ->
+         | phy_pif :: _ ->
+           let pif =
+             match vlan with
+             | Some vlan ->
+               let name_label = Printf.sprintf "Pool-wide network associated with %s on VLAN%s" device vlan in
+               let network = Xapi_network.create ~__context ~name_label ~name_description:"" ~mTU:1500L ~other_config:[] ~tags:[] in
+               let vlan = Xapi_vlan.create ~__context ~tagged_PIF:phy_pif ~network ~tag:(Int64.of_string vlan) in
+               Db.VLAN.get_untagged_PIF ~__context ~self:vlan
+             | None -> phy_pif
+           in
            Xapi_pif.reconfigure_ip ~__context ~self:pif ~mode ~iP ~netmask ~gateway ~dNS;
            Xapi_host.management_reconfigure ~__context ~pif;
       );
