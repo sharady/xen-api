@@ -893,7 +893,7 @@ let eject ~__context ~host =
     let management_pif = Xapi_host.get_management_interface ~__context ~host in
     let pif = Db.PIF.get_record ~__context ~self:management_pif in
     let management_device =
-      (* assumes that the management interface is either physical or a bond *)
+      (* assumes that the management interface is either physical or a bond or a vlan *)
       if pif.API.pIF_bond_master_of <> [] then
         let bond = List.hd pif.API.pIF_bond_master_of in
         let primary_slave = Db.Bond.get_primary_slave ~__context ~self:bond in
@@ -908,8 +908,9 @@ let eject ~__context ~host =
     in
 
     let write_first_boot_management_interface_configuration_file () =
-      let bridge = Xapi_pif.bridge_naming_convention management_device in
-      Xapi_inventory.update Xapi_inventory._management_interface bridge;
+      (* During pool.eject firstboot scripts running on the ejected host will write
+       * the new management_interface bridge, Lets put an empty string in inventory *)
+      Xapi_inventory.update Xapi_inventory._management_interface "";
       let primary_address_type = Db.PIF.get_primary_address_type ~__context ~self:management_pif in
       Xapi_inventory.update Xapi_inventory._management_address_type
         (Record_util.primary_address_type_to_string primary_address_type);
@@ -923,6 +924,12 @@ let eject ~__context ~host =
         else
           "\n"
       end in
+      (* If the management_interface exists on a vlan, write the vlan_id into management.conf *)
+      let vlan_id = pif.API.pIF_VLAN in
+      let configuration_file_contents = configuration_file_contents ^
+        if (Int64.to_int vlan_id) <> -1 then "VLAN=" ^ (Int64.to_string vlan_id) ^ "\n"
+        else "\n"
+      in
       Unixext.write_string_to_file
         (Xapi_globs.first_boot_dir ^ "data/management.conf")
         (configuration_file_contents) in
