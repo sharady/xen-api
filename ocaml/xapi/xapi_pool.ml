@@ -526,9 +526,11 @@ let create_or_get_vdi_on_master __context rpc session_id (vdi_ref, vdi) : API.re
 
 let create_or_get_network_on_master __context rpc session_id (network_ref, network) : API.ref_network =
   let my_bridge = network.API.network_bridge in
-  let is_physical = match network.API.network_PIFs with
+  let is_physical_or_vlan = match network.API.network_PIFs with
     | [] -> false
     | hd :: _ -> Db.PIF.get_physical ~__context ~self:hd
+      || (Xapi_host.get_management_interface ~__context ~host:(Helpers.get_localhost ~__context) = hd
+      && Db.PIF.get_VLAN ~__context ~self:hd <> -1L)
   in
   let is_himn =
     (List.mem_assoc Xapi_globs.is_host_internal_management_network network.API.network_other_config) &&
@@ -536,10 +538,11 @@ let create_or_get_network_on_master __context rpc session_id (network_ref, netwo
   in
 
   let new_network_ref =
-    if is_physical || is_himn then
-      (* Physical network or Host Internal Management Network:
+    if is_physical_or_vlan || is_himn then
+      (* Physical network or Vlan network or Host Internal Management Network:
          			 * try to join an existing network with the same bridge name, or create one.
          			 * This relies on the convention that physical PIFs with the same device name need to be connected.
+         			 * If Management Interface is on a VLAN then that PIF with the same bridge need to be connected
          			 * Furthermore, there should be only one Host Internal Management Network in a pool. *)
       try
         let pool_networks = Client.Network.get_all_records ~rpc ~session_id in
@@ -716,8 +719,12 @@ let update_non_vm_metadata ~__context ~rpc ~session_id =
   let my_pifs = Db.PIF.get_records_where ~__context ~expr:(
       Eq (Field "physical", Literal "true")
     ) in
+  let vlan_pif =
+    let self = Xapi_host.get_management_interface ~__context ~host:(Helpers.get_localhost ~__context) in
+    if Db.PIF.get_VLAN ~__context ~self <> -1L then [(self, Db.PIF.get_record ~__context ~self)] else []
+  in
   let (_ : API.ref_PIF option list) =
-    List.map (protect_exn (create_or_get_pif_on_master __context rpc session_id)) my_pifs in
+    List.map (protect_exn (create_or_get_pif_on_master __context rpc session_id)) (my_pifs @ vlan_pif) in
 
   (* update PVS sites *)
   let my_pvs_sites = Db.PVS_site.get_all_records ~__context in
