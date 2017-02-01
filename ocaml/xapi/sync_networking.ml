@@ -148,6 +148,23 @@ let copy_bonds_from_master ~__context () =
 (* This is now executed fully on the master, once asked by the slave when the slave's Xapi starts up *)
 let copy_vlans_from_master ~__context () =
   let host = !Xapi_globs.localhost_ref in
+  let master = Helpers.get_master ~__context in
+  let mgmt_interface = Xapi_host.get_management_interface ~__context ~host:master in
+  if Db.PIF.get_VLAN ~__context ~self:mgmt_interface <> -1L then
+    let mgmt_network = Db.PIF.get_network ~__context ~self:mgmt_interface in
+    let slave_vlan_pif = Db.PIF.get_records_where ~__context ~expr:(And (
+      Eq (Field "host", Literal (Ref.string_of host)),
+      Eq (Field "network", Literal (Ref.string_of mgmt_network)))
+    ) in
+  begin match slave_vlan_pif with
+  | [] -> ()
+  | (pif, _) :: _ ->
+    let vlan_ref, vlan_record = List.hd (Db.VLAN.get_records_where ~__context ~expr:
+      (Eq (Field "untagged_PIF", Literal (Ref.string_of pif)))) in
+    Db.PIF.set_VLAN_master_of ~__context ~self:pif ~value:vlan_ref;
+    Xapi_host.move_management ~__context ~to_pif:pif
+  end;
+
   let oc = Db.Host.get_other_config ~__context ~self:host in
   if not (List.mem_assoc Xapi_globs.sync_vlans oc &&
           List.assoc Xapi_globs.sync_vlans oc = Xapi_globs.sync_switch_off) then begin

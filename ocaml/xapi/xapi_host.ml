@@ -1450,6 +1450,14 @@ let disable_local_storage_caching ~__context ~host =
   log_and_ignore_exn Rrdd.unset_cache_sr;
   try Db.SR.set_local_cache_enabled ~__context ~self:sr ~value:false with _ -> ()
 
+let move_management ~__context ~to_pif =
+  Nm.bring_pif_up ~__context ~management_interface:true to_pif;
+  let network = Db.PIF.get_network ~__context ~self:to_pif in
+  let bridge = Db.Network.get_bridge ~__context ~self:network in
+  let primary_address_type = Db.PIF.get_primary_address_type ~__context ~self:to_pif in
+  change_management_interface ~__context bridge primary_address_type;
+  Xapi_pif.update_management_flags ~__context ~host:(Helpers.get_localhost ~__context)
+
 (* Here's how we do VLAN resyncing:
    We take a VLAN master and record (i) the Network it is on; (ii) its VLAN tag;
    (iii) the Network of the PIF that underlies the VLAN (e.g. eth0 underlies eth0.25).

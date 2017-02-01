@@ -171,14 +171,6 @@ let move_tunnel ~__context host new_transport_PIF old_tunnel =
     ignore (List.map (Xapi_vif.move_internal ~__context ~network:network) vifs);
   end
 
-let move_management ~__context from_pif to_pif =
-  Nm.bring_pif_up ~__context ~management_interface:true to_pif;
-  let network = Db.PIF.get_network ~__context ~self:to_pif in
-  let bridge = Db.Network.get_bridge ~__context ~self:network in
-  let primary_address_type = Db.PIF.get_primary_address_type ~__context ~self:to_pif in
-  Xapi_host.change_management_interface ~__context bridge primary_address_type;
-  Xapi_pif.update_management_flags ~__context ~host:(Helpers.get_localhost ~__context)
-
 let fix_bond ~__context ~bond =
   let bond_rec = Db.Bond.get_record ~__context ~self:bond in
   let members = bond_rec.API.bond_slaves in
@@ -209,7 +201,7 @@ let fix_bond ~__context ~bond =
       (* The bond contains the management interface: move management to the master.
          			 * This interface will be plugged automatically. *)
       debug "Moving management from slave to master";
-      move_management ~__context management_pif master;
+      Xapi_host.move_management ~__context ~to_pif:master;
       (* Set the primary slave to the former management PIF. *)
       Db.Bond.set_primary_slave ~__context ~self:bond ~value:management_pif;
     | [] ->
@@ -377,7 +369,7 @@ let create ~__context ~network ~members ~mAC ~mode ~properties =
           (* The bond contains the management interface: move management to the master.
              			 * This interface will be plugged automatically. *)
           debug "Moving management from slave to master";
-          move_management ~__context management_pif master
+          Xapi_host.move_management ~__context ~to_pif:master
         | None ->
           debug "Plugging the bond";
           Nm.bring_pif_up ~__context master
@@ -438,7 +430,7 @@ let destroy ~__context ~self =
       if Db.PIF.get_management ~__context ~self:master = true then begin
         (* The master is the management interface: move management to first slave *)
         debug "Moving management from master to slaves";
-        move_management ~__context master primary_slave;
+        Xapi_host.move_management ~__context ~to_pif:primary_slave;
         List.iter (fun pif -> if pif <> primary_slave then Nm.bring_pif_up ~__context pif) members
       end else begin
         (* Plug the members if the master was plugged *)
