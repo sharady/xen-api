@@ -451,6 +451,7 @@ let destroy ~__context ~self =
       let local_vifs = get_local_vifs ~__context host [master_network] in
       let local_vlans = Db.PIF.get_VLAN_slave_of ~__context ~self:master in
       let local_tunnels = Db.PIF.get_tunnel_transport_PIF_of ~__context ~self:master in
+      let management_vlan, local_vlans_without_mgmt = get_management_vlan ~__context local_vlans in
 
       (* CA-86573: forbid the deletion of a bond involving the mgmt interface if HA is on *)
       let pool = Helpers.get_pool ~__context in
@@ -459,6 +460,12 @@ let destroy ~__context ~self =
 
       (* Copy IP configuration from master to primary member *)
       move_configuration ~__context master primary_slave;
+
+      (* Move Management VLAN from master to primary member *)
+      begin match management_vlan with
+        | Some management_vlan -> move_vlan ~__context host primary_slave management_vlan ~management_interface:true
+        | None -> ()
+      end;
 
       if Db.PIF.get_management ~__context ~self:master = true then begin
         (* The master is the management interface: move management to first slave *)
@@ -479,7 +486,7 @@ let destroy ~__context ~self =
 
       (* Move VLANs down *)
       debug "Check VLANs to move from master to slaves";
-      List.iter (move_vlan ~__context host primary_slave) local_vlans;
+      List.iter (move_vlan ~__context host primary_slave) local_vlans_without_mgmt;
       TaskHelper.set_progress ~__context 0.6;
 
       (* Move tunnels down *)
