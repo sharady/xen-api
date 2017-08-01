@@ -1432,6 +1432,15 @@ let rec cmdtable_data : (string*cmd_spec) list =
       flags=[Standard; Vm_selectors];
     };
 
+    "vm-add-bios-strings",
+    {
+      reqd=["name"; "value"];
+      optn=[];
+      help="Add custom BIOS strings to this VM.";
+      implementation=No_fd Cli_operations.vm_add_bios_strings;
+      flags=[Vm_selectors];
+    };
+
     "vm-copy-bios-strings",
     {
       reqd=["host-uuid"];

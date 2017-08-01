@@ -934,6 +934,9 @@ let get_SRs_required_for_recovery ~__context ~self ~session_to =
 
 (* BIOS strings *)
 
+let add_bios_strings ~__context ~vm ~name ~value =
+  info "TAG: Details got vm=%s name=%s value=%s" (Db.VM.get_name_label ~__context ~self:vm) name value
+
 let copy_bios_strings ~__context ~vm ~host =
   (* only allow to fill in BIOS strings if they are not yet set *)
   let current_strings = Db.VM.get_bios_strings ~__context ~self:vm in

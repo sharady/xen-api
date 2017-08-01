@@ -3797,6 +3797,13 @@ let vm_export_aux obj_type fd printer rpc session_id params =
   let ref = Client.VM.get_by_uuid rpc session_id uuid in
   export_common fd printer rpc session_id params filename num use_compression preserve_power_state (vm_record rpc session_id ref)
 
+let vm_add_bios_strings printer rpc session_id params =
+  let name = List.assoc "name" params in
+  let value = List.assoc "value" params in
+  let op vm =
+    Client.VM.add_bios_strings rpc session_id (vm.getref ()) name value in
+  ignore(do_vm_op printer rpc session_id op params [])
+
 let vm_copy_bios_strings printer rpc session_id params =
   let host = Client.Host.get_by_uuid rpc session_id (List.assoc "host-uuid" params) in
   let op vm =

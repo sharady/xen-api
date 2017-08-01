@@ -1973,6 +1973,9 @@ module Forward = functor(Local: Custom_actions.CUSTOM_ACTIONS) -> struct
       let local_fn = Local.VM.s3_resume ~vm in
       forward_vm_op ~local_fn ~__context ~vm (fun session_id rpc -> Client.VM.s3_resume rpc session_id vm)
 
+    let add_bios_strings ~__context ~vm ~name ~value =
+      info "VM.add_bios_strings: VM = '%s'; name = '%s'; value = '%s'" (vm_uuid ~__context vm) name value;
+      Local.VM.add_bios_strings ~__context ~vm ~name ~value
 
     let copy_bios_strings ~__context ~vm ~host =
       info "VM.copy_bios_strings: VM = '%s'; host = '%s'" (vm_uuid ~__context vm) (host_uuid ~__context host);
