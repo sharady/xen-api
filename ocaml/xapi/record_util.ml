@@ -15,6 +15,8 @@
 
 exception Record_failure of string
 
+open API
+
 open Stdext.Xstringext
 
 let power_state_to_string state =
@@ -26,72 +28,14 @@ let power_state_to_string state =
   | `ShuttingDown -> "Shutting down"
   | `Migrating -> "Migrating"
 
-let vm_operation_table =
-  [
-    `assert_operation_valid, "assertoperationvalid";
-    `changing_dynamic_range, "changing_dynamic_range";
-    `changing_static_range, "changing_static_range";
-    `changing_shadow_memory, "changing_shadow_memory";
-    `clean_reboot, "clean_reboot";
-    `clean_shutdown, "clean_shutdown";
-    `clone, "clone";
-    `snapshot, "snapshot";
-    `checkpoint, "checkpoint";
-    `snapshot_with_quiesce, "snapshot_with_quiesce";
-    `copy, "copy";
-    `revert, "revert";
-    `reverting, "reverting";
-    `provision, "provision";
-    `destroy, "destroy";
-    `export, "export";
-    `metadata_export, "metadata_export";
-    `import, "import";
-    `get_boot_record, "get_boot_record";
-    `data_source_op, "data_sources_op";
-    `hard_reboot, "hard_reboot";
-    `hard_shutdown, "hard_shutdown";
-    `migrate_send, "migrate_send";
-    `pause, "pause";
-    `resume, "resume";
-    `resume_on, "resume_on";
-    `changing_VCPUs_live, "changing_VCPUs_live";
-    `start, "start";
-    `start_on, "start_on";
-    `suspend, "suspend";
-    `unpause, "unpause";
-    `update_allowed_operations, "update_allowed_operations";
-    `make_into_template, "make_into_template";
-    `send_sysrq, "send_sysrq";
-    `send_trigger, "send_trigger";
-    `changing_memory_live, "changing_memory_live";
-    `awaiting_memory_live, "awaiting_memory_live";
-    `changing_shadow_memory_live, "changing_shadow_memory_live";
-    `pool_migrate, "pool_migrate";
-    `power_state_reset, "power_state_reset";
-    `csvm, "csvm";
-    `call_plugin, "call_plugin";
-  ]
+let rpc_to_str conv x = conv x |> function | Rpc.String r -> r | _ -> failwith "Will never happen"
+let str_of_rpc conv x = conv (Rpc.String x)
 
-let vm_operation_to_string x =
-  if not(List.mem_assoc x vm_operation_table)
-  then "(unknown operation)"
-  else List.assoc x vm_operation_table
-
+let vm_operation_to_string x = rpc_to_str rpc_of_vm_operations x
 let string_to_vm_operation x =
-  let table = List.map (fun (a, b) -> b, a) vm_operation_table in
-  if not(List.mem_assoc x table)
-  then (raise (Api_errors.Server_error(Api_errors.invalid_value, [ "blocked_operation"; x ])))
-  else List.assoc x table
+  try str_of_rpc vm_operations_of_rpc x with _ -> raise (Api_errors.Server_error(Api_errors.invalid_value, [ "blocked_operation"; x ]))
 
-let vm_bios_key_to_string: API.vm_bios_string_keys -> string = function
-  | `biosvendor -> "bios-vendor"
-  | `biosversion -> "bios-version"
-  | `systemmanufacturer -> "system-manufacturer"
-  | `systemproductname -> "system-product-name"
-  | `systemversion -> "system-version"
-  | `systemserialnumber -> "system-serial-number"
-  | `enclosureassettag -> "enclosure-asset-tag"
-
+let vm_bios_key_to_string x = rpc_to_str rpc_of_vm_bios_key x
 let string_to_vm_bios_key: string -> API.vm_bios_string_keys = function
   | "bios-vendor" -> `biosvendor
   | "bios-version" -> `biosversion
@@ -103,38 +47,11 @@ let string_to_vm_bios_key: string -> API.vm_bios_string_keys = function
   | s -> raise (Record_failure ("Expected 'bios-vendor', 'bios-version', 'system-manufacturer',
     'system-product-name', 'system-version', 'system-serial-number', 'enclosure-asset-tag' got "^s))
 
-let pool_operation_to_string = function
-  | `ha_enable -> "ha_enable"
-  | `ha_disable -> "ha_disable"
+let pool_operation_to_string x = rpc_to_str rpc_of_pool_allowed_operations x
 
-let host_operation_to_string = function
-  | `provision -> "provision"
-  | `evacuate -> "evacuate"
-  | `shutdown -> "shutdown"
-  | `reboot -> "reboot"
-  | `power_on -> "power_on"
-  | `vm_start -> "VM.start"
-  | `vm_resume -> "VM.resume"
-  | `vm_migrate -> "VM.migrate"
+let host_operation_to_string x = rpc_to_str rpc_of_host_allowed_operations x
 
-let vdi_operation_to_string: API.vdi_operations -> string = function
-  | `clone -> "clone"
-  | `copy -> "copy"
-  | `resize -> "resize"
-  | `resize_online -> "resize_online"
-  | `destroy -> "destroy"
-  | `force_unlock -> "force_unlock"
-  | `snapshot -> "snapshot"
-  | `mirror -> "mirror"
-  | `forget -> "forget"
-  | `update -> "update"
-  | `generate_config -> "generate_config"
-  | `enable_cbt -> "enable_cbt"
-  | `disable_cbt -> "disable_cbt"
-  | `data_destroy -> "data_destroy"
-  | `export_changed_blocks -> "export_changed_blocks"
-  | `set_on_boot -> "set_on_boot"
-  | `blocked -> "blocked"
+let vdi_operation_to_string x = rpc_to_str rpc_of_vdi_operations x
 
 let sr_operation_to_string: API.storage_operations -> string = function
   | `scan -> "scan"
@@ -157,28 +74,13 @@ let sr_operation_to_string: API.storage_operations -> string = function
   | `vdi_export_changed_blocks -> "VDI.export_changed_blocks"
   | `pbd_create -> "PBD.create"
   | `pbd_destroy -> "PBD.destroy"
+  | `unknown -> "Unknown"
 
-let vbd_operation_to_string = function
-  | `attach -> "attach"
-  | `eject -> "eject"
-  | `insert -> "insert"
-  | `plug -> "plug"
-  | `unplug -> "unplug"
-  | `unplug_force -> "unplug_force"
-  | `pause -> "pause"
-  | `unpause -> "unpause"
+let vbd_operation_to_string x = rpc_to_str rpc_of_vbd_operations x
 
-let vif_operation_to_string = function
-  | `attach -> "attach"
-  | `plug -> "plug"
-  | `unplug -> "unplug"
-  | `unplug_force -> "unplug_force"
+let vif_operation_to_string x = rpc_to_str rpc_of_vif_operations x
 
-let vif_locking_mode_to_string = function
-  | `network_default -> "network_default"
-  | `locked -> "locked"
-  | `unlocked -> "unlocked"
-  | `disabled -> "disabled"
+let vif_locking_mode_to_string x = rpc_to_str rpc_of_vif_locking_mode x
 
 let string_to_vif_locking_mode = function
   | "network_default" -> `network_default
@@ -187,10 +89,7 @@ let string_to_vif_locking_mode = function
   | "disabled" -> `disabled
   | s -> raise (Record_failure ("Expected 'network_default', 'locked', 'unlocked', 'disabled', got "^s))
 
-let vmss_type_to_string = function
-  | `snapshot -> "snapshot"
-  | `checkpoint -> "checkpoint"
-  | `snapshot_with_quiesce -> "snapshot_with_quiesce"
+let vmss_type_to_string x = rpc_to_str rpc_of_vmss_type x
 
 let string_to_vmss_type = function
   | "snapshot" -> `snapshot
@@ -198,10 +97,7 @@ let string_to_vmss_type = function
   | "snapshot_with_quiesce" -> `snapshot_with_quiesce
   | s -> raise (Record_failure ("Expected 'snapshot', 'checkpoint', 'snapshot_with_quiesce', got "^s))
 
-let vmss_frequency_to_string = function
-  | `hourly -> "hourly"
-  | `daily -> "daily"
-  | `weekly -> "weekly"
+let vmss_frequency_to_string x = rpc_to_str rpc_of_vmss_frequency x
 
 let string_to_vmss_frequency = function
   | "hourly" -> `hourly
@@ -209,20 +105,14 @@ let string_to_vmss_frequency = function
   | "weekly" -> `weekly
   | s -> raise (Record_failure ("Expected 'hourly', 'daily', 'weekly', got "^s))
 
-let network_default_locking_mode_to_string = function
-  | `unlocked -> "unlocked"
-  | `disabled -> "disabled"
+let network_default_locking_mode_to_string x = rpc_to_str rpc_of_network_default_locking_mode x
 
 let string_to_network_default_locking_mode = function
   | "unlocked" -> `unlocked
   | "disabled" -> `disabled
   | s -> raise (Record_failure ("Expected 'unlocked' or 'disabled', got "^s))
 
-let vm_appliance_operation_to_string = function
-  | `start -> "start"
-  | `clean_shutdown -> "clean_shutdown"
-  | `hard_shutdown -> "hard_shutdown"
-  | `shutdown -> "shutdown"
+let vm_appliance_operation_to_string x = rpc_to_str rpc_of_vm_appliance_operation x
 
 let cpu_feature_to_string f =
   match f with
@@ -291,18 +181,9 @@ let cpu_feature_to_string f =
   | `CMPLEGACY -> "CMPLEGACY"
   | `VMX -> "VMX"
 
-let task_status_type_to_string s =
-  match s with
-  | `pending -> "pending"
-  | `success -> "success"
-  | `failure -> "failure"
-  | `cancelling -> "cancelling"
-  | `cancelled -> "cancelled"
+let task_status_type_to_string x = rpc_to_str rpc_of_task_status_type x
 
-let protocol_to_string = function
-  | `vt100 -> "VT100"
-  | `rfb -> "RFB"
-  | `rdp -> "RDP"
+let protocol_to_string x = rpc_to_str rpc_of_console_protocol x
 
 let cpu_feature_list_to_string list =
   String.concat "," (List.map (fun x -> cpu_feature_to_string x) list)
@@ -311,6 +192,7 @@ let task_allowed_operations_to_string s =
   match s with
   | `cancel -> "Cancel"
   | `destroy -> "Destroy"
+  | `unknown -> "unknown"
 
 let alert_level_to_string s =
   match s with
@@ -322,6 +204,7 @@ let on_normal_exit_to_string x =
   match x with
     `destroy -> "Destroy"
   | `restart -> "Restart"
+  | `unknown -> "unknown"
 
 let string_to_on_normal_exit s =
   match String.lowercase s with
@@ -337,6 +220,7 @@ let on_crash_behaviour_to_string x=
   | `coredump_and_restart -> "Core dump and restart"
   | `preserve -> "Preserve"
   | `rename_restart -> "Rename restart"
+  | `unknown -> "unknown"
 
 let string_to_on_crash_behaviour s=
   match String.lowercase s with
@@ -349,12 +233,7 @@ let string_to_on_crash_behaviour s=
   | _ -> raise (Record_failure ("Expected 'destroy', 'coredump_and_destroy'," ^
                                 "'restart', 'coredump_and_restart', 'preserve' or 'rename_restart', got "^s))
 
-let host_display_to_string h =
-  match h with
-  | `enabled -> "enabled"
-  | `enable_on_reboot -> "enable_on_reboot"
-  | `disabled -> "disabled"
-  | `disable_on_reboot -> "disable_on_reboot"
+let host_display_to_string h = rpc_to_str rpc_of_host_display h
 
 let pgpu_dom0_access_to_string x =
   host_display_to_string x
@@ -364,6 +243,7 @@ let boot_type_to_string x =
     `bios -> "BIOS"
   | `grub -> "GRUB"
   | `kernelexternal -> "Kernel external"
+  | `unknown -> "unknown"
 
 let string_to_boot_type s =
   match String.lowercase s with
@@ -387,6 +267,7 @@ let string_to_vbd_mode s =
 let vbd_mode_to_string = function
   | `RO -> "ro"
   | `RW -> "rw"
+  | `unknown -> "unknown"
 
 let string_to_vbd_type s =
   match String.lowercase s with
@@ -403,25 +284,11 @@ let power_to_string h =
   | `Suspended -> "suspended"
   | `ShuttingDown -> "shutting down"
   | `Migrating -> "migrating"
+  | `unknown -> "unknown"
 
-let vdi_type_to_string t =
-  match t with
-  | `system -> "System"
-  | `user -> "User"
-  | `ephemeral -> "Ephemeral"
-  | `suspend -> "Suspend"
-  | `crashdump -> "Crashdump"
-  | `ha_statefile -> "HA statefile"
-  | `metadata -> "Metadata"
-  | `redo_log -> "Redo log"
-  | `rrd -> "rrd"
-  | `pvs_cache -> "PVS cache"
-  | `cbt_metadata -> "CBT metadata"
+let vdi_type_to_string t = rpc_to_str rpc_of_vdi_type t
 
-let ip_configuration_mode_to_string = function
-  | `None -> "None"
-  | `DHCP -> "DHCP"
-  | `Static -> "Static"
+let ip_configuration_mode_to_string x = rpc_to_str rpc_of_ip_configuration_mode x
 
 let ip_configuration_mode_of_string m =
   match String.lowercase m with
@@ -430,9 +297,7 @@ let ip_configuration_mode_of_string m =
   | "static" -> `Static
   | s        -> raise (Record_failure ("Expected 'dhcp','none' or 'static', got "^s))
 
-let vif_ipv4_configuration_mode_to_string = function
-  | `None -> "None"
-  | `Static -> "Static"
+let vif_ipv4_configuration_mode_to_string x = rpc_to_str rpc_of_vif_ipv4_configuration_mode x
 
 let vif_ipv4_configuration_mode_of_string m =
   match String.lowercase m with
@@ -440,11 +305,7 @@ let vif_ipv4_configuration_mode_of_string m =
   | "static" -> `Static
   | s        -> raise (Record_failure ("Expected 'none' or 'static', got "^s))
 
-let ipv6_configuration_mode_to_string = function
-  | `None -> "None"
-  | `DHCP -> "DHCP"
-  | `Static -> "Static"
-  | `Autoconf -> "Autoconf"
+let ipv6_configuration_mode_to_string x = rpc_to_str rpc_of_ipv6_configuration_mode x
 
 let ipv6_configuration_mode_of_string m =
   match String.lowercase m with
@@ -454,9 +315,7 @@ let ipv6_configuration_mode_of_string m =
   | "autoconf" -> `Autoconf
   | s        -> raise (Record_failure ("Expected 'dhcp','none' 'autoconf' or 'static', got "^s))
 
-let vif_ipv6_configuration_mode_to_string = function
-  | `None -> "None"
-  | `Static -> "Static"
+let vif_ipv6_configuration_mode_to_string x = rpc_to_str rpc_of_vif_ipv6_configuration_mode x
 
 let vif_ipv6_configuration_mode_of_string m =
   match String.lowercase m with
@@ -464,9 +323,7 @@ let vif_ipv6_configuration_mode_of_string m =
   | "static" -> `Static
   | s        -> raise (Record_failure ("Expected 'none' or 'static', got "^s))
 
-let primary_address_type_to_string = function
-  | `IPv4 -> "IPv4"
-  | `IPv6 -> "IPv6"
+let primary_address_type_to_string x = rpc_to_str rpc_of_primary_address_type x
 
 let primary_address_type_of_string m =
   match String.lowercase m with
@@ -474,10 +331,7 @@ let primary_address_type_of_string m =
   | "ipv6"   -> `IPv6
   | s        -> raise (Record_failure ("Expected 'ipv4' or 'ipv6', got "^s))
 
-let bond_mode_to_string = function
-  | `balanceslb -> "balance-slb"
-  | `activebackup -> "active-backup"
-  | `lacp -> "lacp"
+let bond_mode_to_string x = rpc_to_str rpc_of_bond_mode x
 
 let bond_mode_of_string m =
   match String.lowercase m with
@@ -489,6 +343,7 @@ let bond_mode_of_string m =
 let allocation_algorithm_to_string = function
   | `depth_first -> "depth-first"
   | `breadth_first -> "breadth-first"
+  | `unknown -> "unknown"
 
 let allocation_algorithm_of_string a =
   match String.lowercase a with
@@ -502,6 +357,7 @@ let pvs_proxy_status_to_string = function
   | `caching -> "caching"
   | `incompatible_write_cache_mode -> "incompatible-write-cache-mode"
   | `incompatible_protocol_version -> "incompatible-protocol-version"
+  | `unknown -> "unknown"
 
 let bool_of_string s =
   match String.lowercase s with
@@ -515,9 +371,7 @@ let sdn_protocol_of_string s =
   | "pssl" -> `pssl
   |_-> raise (Record_failure ("Expected 'ssl','pssl', got "^s))
 
-let sdn_protocol_to_string = function
-  | `ssl -> "ssl"
-  | `pssl -> "pssl"
+let sdn_protocol_to_string x = rpc_to_str rpc_of_sdn_controller_protocol x
 
 (* string_to_string_map_to_string *)
 let s2sm_to_string sep x =
@@ -535,16 +389,9 @@ let i642fm_to_string sep x =
 let i642sm_to_string sep x =
   String.concat sep (List.map (fun (a,b) -> Printf.sprintf "%Ld %s" a b) x)
 
-let on_boot_to_string onboot =
-  match onboot with
-  | `reset -> "reset"
-  | `persist -> "persist"
+let on_boot_to_string onboot = rpc_to_str rpc_of_on_boot onboot
 
-let tristate_to_string tristate =
-  match tristate with
-  | `yes -> "true"
-  | `no -> "false"
-  | `unspecified -> "unspecified"
+let tristate_to_string tristate = rpc_to_str rpc_of_tristate_type tristate
 
 let wrap f err x = try f x with _ -> err x
 let generic_error x = raise (Record_failure ("Unknown value: "^x))
@@ -605,3 +452,6 @@ let mac_from_int_array macs =
 (* generate a random mac that is locally administered *)
 let random_mac_local () =
   mac_from_int_array (Array.init 6 (fun i -> Random.int 0x100))
+
+let after_apply_guidance_to_string x = rpc_to_str API.rpc_of_after_apply_guidance x
+let after_apply_guidance_to_string_set x = List.map after_apply_guidance_to_string x
