@@ -35,7 +35,17 @@ let vm_operation_to_string x = rpc_to_str rpc_of_vm_operations x
 let string_to_vm_operation x =
   try str_of_rpc vm_operations_of_rpc x with _ -> raise (Api_errors.Server_error(Api_errors.invalid_value, [ "blocked_operation"; x ]))
 
-let vm_bios_key_to_string x = rpc_to_str rpc_of_vm_bios_key x
+(*let vm_bios_key_to_string x = rpc_to_str rpc_of_vm_bios_keys x*)
+let vm_bios_key_to_string: API.vm_bios_string_keys -> string = function
+  | `biosvendor -> "bios-vendor"
+  | `biosversion -> "bios-version"
+  | `systemmanufacturer -> "system-manufacturer"
+  | `systemproductname -> "system-product-name"
+  | `systemversion -> "system-version"
+  | `systemserialnumber -> "system-serial-number"
+  | `enclosureassettag -> "enclosure-asset-tag"
+  | `unknown -> "unknown"
+
 let string_to_vm_bios_key: string -> API.vm_bios_string_keys = function
   | "bios-vendor" -> `biosvendor
   | "bios-version" -> `biosversion
