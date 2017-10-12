@@ -937,6 +937,8 @@ let _ =
     ~doc:"The host joining the pool must have the same API version as the pool master." ();
   error Api_errors.pool_joining_host_must_have_same_db_schema ["host_db_schema";"master_db_schema"]
     ~doc:"The host joining the pool must have the same database schema as the pool master." ();
+  error Api_errors.pool_join_in_progress [ ]
+    ~doc:"The operation could not be performed because a pool join is already in progress" ();
 
   (* External directory service *)
   error Api_errors.subject_cannot_be_resolved []
