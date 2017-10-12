@@ -6839,6 +6839,7 @@ let pool_operations =
   Enum ("pool_allowed_operations",
         [ "ha_enable", "Indicates this pool is in the process of enabling HA";
           "ha_disable", "Indicates this pool is in the process of disabling HA";
+          "pool_join", "Indicates a host is in the process of joining this pool";
         ])
 
 let pool_enable_ha = call

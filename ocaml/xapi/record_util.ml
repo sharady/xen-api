@@ -86,6 +86,7 @@ let string_to_vm_operation x =
 let pool_operation_to_string = function
   | `ha_enable -> "ha_enable"
   | `ha_disable -> "ha_disable"
+  | `pool_join -> "pool_join"
 
 let host_operation_to_string = function
   | `provision -> "provision"
