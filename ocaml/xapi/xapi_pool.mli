@@ -65,6 +65,7 @@ val join_force :
   __context:Context.t ->
   master_address:string ->
   master_username:string -> master_password:string -> unit
+val set_pool_join_in_progress : __context:Context.t -> self:API.ref_pool -> value:bool -> unit
 val emergency_transition_to_master : __context:'a -> unit
 val emergency_reset_master : __context:'a -> master_address:string -> unit
 val recover_slaves : __context:Context.t -> API.ref_host list

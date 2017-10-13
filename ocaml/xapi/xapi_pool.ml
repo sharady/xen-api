@@ -977,6 +977,14 @@ let join ~__context ~master_address ~master_username ~master_password  =
 let join_force ~__context ~master_address ~master_username ~master_password  =
   join_common ~__context ~master_address ~master_username ~master_password ~force:true
 
+let set_pool_join_in_progress ~__context ~self ~value =
+  if value then
+    let task_id = Ref.string_of (Context.get_task_id __context) in
+    Db.Pool.add_to_current_operations ~__context ~self ~key:task_id ~value:`pool_join
+  else
+    List.filter (fun (_, y) -> y = `pool_join) (Db.Pool.get_current_operations ~__context ~self)
+    |> List.iter (fun (x, _) -> Db.Pool.remove_from_current_operations ~__context ~self ~key:x)
+
 (* Assume that db backed up from master will be there and ready to go... *)
 let emergency_transition_to_master ~__context =
   if Localdb.get Constants.ha_armed = "true"
