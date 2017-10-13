@@ -7466,6 +7466,19 @@ let pool_remove_from_guest_agent_config = call
     ~allowed_roles:_R_POOL_ADMIN
     ()
 
+let pool_set_pool_join_in_progress = call
+    ~name:"set_pool_join_in_progress"
+    ~in_oss_since:None
+    ~in_product_since:rel_inverness
+    ~params:[
+      Ref _pool, "self", "The pool";
+      Bool, "value", "Add or remove pool_join from pool current operations"
+    ]
+    ~doc:"Add or remove pool_join from pool current operations."
+    ~allowed_roles:_R_POOL_OP
+    ~hide_from_docs:true
+    ()
+
 (** A pool class *)
 let pool =
   create_obj
@@ -7539,6 +7552,7 @@ let pool =
       ; pool_has_extension
       ; pool_add_to_guest_agent_config
       ; pool_remove_from_guest_agent_config
+      ; pool_set_pool_join_in_progress
       ]
     ~contents:
       ([uid ~in_oss_since:None _pool] @
