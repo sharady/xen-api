@@ -912,6 +912,10 @@ let join_common ~__context ~master_address ~master_username ~master_password ~fo
   in
 
   finally (fun () ->
+      let pool = List.hd (Client.Pool.get_all rpc session_id) in
+      if List.exists (fun s -> snd s = `pool_join) (Client.Pool.get_current_operations rpc session_id pool) then
+        raise (Api_errors.Server_error(Api_errors.pool_join_in_progress, []));
+      Client.Pool.set_pool_join_in_progress rpc session_id pool true;
       pre_join_checks ~__context ~rpc ~session_id ~force;
       cluster_secret := Client.Pool.initial_auth rpc session_id;
 
@@ -928,6 +932,7 @@ let join_common ~__context ~master_address ~master_username ~master_password ~fo
          		on with the join *)
       try
         update_non_vm_metadata ~__context ~rpc ~session_id;
+        Client.Pool.set_pool_join_in_progress rpc session_id pool false;
         ignore(Importexport.remote_metadata_export_import ~__context ~rpc ~session_id ~remote_address:master_address ~restore:true `All)
       with e ->
         debug "Error whilst importing db objects into master; aborted: %s" (Printexc.to_string e);
